@@ -4,6 +4,25 @@
 #include "kernel/fs.h"
 #include "kernel/fcntl.h"
 
+char
+type_readable(short type){
+  char ch = 0;
+  switch(type){
+    case T_DIR:
+      ch = 'd';
+      break;
+    case T_FILE:
+      ch = 'f';
+      break;
+    case T_DEVICE:
+      ch = 'D';
+      break;
+    default:
+      ch = 'e';
+  }
+  return ch;
+}
+
 char*
 fmtname(char *path)
 {
@@ -45,7 +64,7 @@ ls(char *path)
   switch(st.type){
   case T_DEVICE:
   case T_FILE:
-    printf("%s %d %d %l\n", fmtname(path), st.type, st.ino, st.size);
+    printf("%s %d %d %l\n", fmtname(path), /* type_readable(st.type) */st.type, st.ino, st.size);
     break;
 
   case T_DIR:
@@ -65,7 +84,7 @@ ls(char *path)
         printf("ls: cannot stat %s\n", buf);
         continue;
       }
-      printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
+      printf("%s %d %d %d\n", fmtname(buf), /* type_readable(st.type) */st.type, st.ino, st.size);
     }
     break;
   }

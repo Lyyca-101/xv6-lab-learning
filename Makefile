@@ -147,6 +147,7 @@ endif
 
 _%: %.o $(ULIB)
 	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $^
+	@echo build $@
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
@@ -188,6 +189,11 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\
+	$U/_xargs\
 
 
 
@@ -300,6 +306,9 @@ QEMUOPTS += -netdev user,id=net0,hostfwd=udp::$(FWDPORT)-:2000 -object filter-du
 QEMUOPTS += -device e1000,netdev=net0,bus=pcie.0
 endif
 
+show-progs:
+	@echo $(UPROGS)
+
 qemu: $K/kernel fs.img
 	$(QEMU) $(QEMUOPTS)
 
@@ -367,4 +376,4 @@ submit-check:
 zipball: clean submit-check
 	git archive --verbose --format zip --output lab.zip HEAD
 
-.PHONY: zipball clean grade submit-check
+.PHONY: zipball clean grade submit-check show-progs
