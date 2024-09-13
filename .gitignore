@@ -11,6 +11,8 @@ entryother
 initcode
 initcode.out
 kernelmemfs
+.vscode/*
+xv6-labs-2023.code-workspace
 mkfs
 kernel/kernel
 user/usys.S

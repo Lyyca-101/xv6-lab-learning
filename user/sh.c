@@ -2,6 +2,7 @@
 
 #include "kernel/types.h"
 #include "user/user.h"
+#include "kernel/stat.h"
 #include "kernel/fcntl.h"
 
 // Parsed command representation
@@ -12,6 +13,8 @@
 #define BACK  5
 
 #define MAXARGS 10
+
+int from_file = 0;
 
 struct cmd {
   int type;
@@ -134,7 +137,8 @@ runcmd(struct cmd *cmd)
 int
 getcmd(char *buf, int nbuf)
 {
-  write(2, "$ ", 2);
+  if(!from_file)
+    write(2, "Lyyca-101$ ", 11);
   memset(buf, 0, nbuf);
   gets(buf, nbuf);
   if(buf[0] == 0) // EOF
@@ -147,6 +151,7 @@ main(void)
 {
   static char buf[100];
   int fd;
+  struct stat st;
 
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
@@ -155,6 +160,17 @@ main(void)
       break;
     }
   }
+
+  if(fstat(0,&st) < 0){
+        fprintf(2, "find: cannot stat\n");
+        close(0);
+        close(1);
+        close(2);
+        exit(1);
+  }
+
+  from_file = st.type == T_FILE;
+  //printf("%d\n",from_file);
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
