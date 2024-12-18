@@ -16,6 +16,13 @@
 
 int from_file = 0;
 
+static const char *commands[] = {
+  "ls",
+  "uptime",
+  "pingpong",
+  "primes"
+};
+
 struct cmd {
   int type;
 };
@@ -134,16 +141,78 @@ runcmd(struct cmd *cmd)
   exit(0);
 }
 
+
+static char*
+sh_gets(char *buf, int max)
+{
+  int i, cc;
+  char c;
+
+  for(i=0; i+1 < max; ){
+    cc = read(0, &c, 1);
+    //printf("%c\n",c);
+    if(cc < 1)
+      break;
+    buf[i++] = c;
+    if(c == '\n' || c == '\r' || c == '\t')
+      break;
+  }
+  buf[i] = '\0';
+  return buf;
+}
+
 int
 getcmd(char *buf, int nbuf)
 {
   if(!from_file)
     write(2, "Lyyca-101$ ", 11);
+  //fprintf(1,"getcmd:1\n");
   memset(buf, 0, nbuf);
-  gets(buf, nbuf);
+  sh_gets(buf, nbuf);
+  //fprintf(1,"getcmd:2\n");
   if(buf[0] == 0) // EOF
     return -1;
   return 0;
+}
+
+/* 
+  assuming len(uncomplete) < len(candidate)
+ */
+static int score_str(const char *uncomplete,const char *candidate){
+  int score = -1;
+  while(*uncomplete && *uncomplete == *candidate){
+    uncomplete++;
+    candidate++;
+    score++;
+  }
+  return score;
+}
+
+static void completecmd(char *buf){
+  /* 
+  step-1 modify console code to make behavior of \t similar to \n
+  step-2 read the readline library,modify the getcmd,build a toy-level
+  readline func.source:https://www.cnblogs.com/hazir/p/instruction_to_readline.html
+   */
+  int len;
+  int index = -1;
+  int score = -1;
+  //printf("\nTODO\n");
+  buf[strlen(buf) - 1] = '\0';
+  
+  /* record the uncompleted cmd name length*/
+  len = strlen(buf);
+  for(int i = 0;i < sizeof(commands)/sizeof(char*);i++){
+    int tmp = score_str(buf,commands[i]);
+    if(tmp > score){
+      score = tmp;
+      index = i;
+    }
+  }
+  if(score != -1){
+    strcpy(buf,commands[index]);
+  }
+  printf("%s\n",buf + len);
 }
 
 int
@@ -169,6 +238,7 @@ main(void)
         exit(1);
   }
 
+  // if std_in is referred to a regular file
   from_file = st.type == T_FILE;
   //printf("%d\n",from_file);
 
@@ -181,8 +251,12 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
-    if(fork1() == 0)
+    if(buf[strlen(buf) - 1] == '\t'){
+        completecmd(buf);
+    }
+    if(fork1() == 0){
       runcmd(parsecmd(buf));
+    }
     wait(0);
   }
   exit(0);

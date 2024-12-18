@@ -50,6 +50,7 @@ struct {
   uint r;  // Read index
   uint w;  // Write index
   uint e;  // Edit index
+  bool concanical;
 } cons;
 
 //
@@ -85,6 +86,8 @@ consoleread(int user_dst, uint64 dst, int n)
 
   target = n;
   acquire(&cons.lock);
+
+
   while(n > 0){
     // wait until interrupt handler has put some
     // input into cons.buffer.
@@ -115,7 +118,7 @@ consoleread(int user_dst, uint64 dst, int n)
     dst++;
     --n;
 
-    if(c == '\n'){
+    if(c == '\n' || !cons.concanical){
       // a whole line has arrived, return to
       // the user-level read().
       break;
@@ -136,6 +139,7 @@ void
 consoleintr(int c)
 {
   acquire(&cons.lock);
+
 
   switch(c){
   case C('P'):  // Print process list.
@@ -160,12 +164,13 @@ consoleintr(int c)
       c = (c == '\r') ? '\n' : c;
 
       // echo back to the user.
-      consputc(c);
+      if(c != '\t')
+        consputc(c);
 
       // store for consumption by consoleread().
       cons.buf[cons.e++ % INPUT_BUF_SIZE] = c;
 
-      if(c == '\n' || c == C('D') || cons.e-cons.r == INPUT_BUF_SIZE){
+      if(c == '\n' || c == '\t' || c == C('D') || cons.e-cons.r == INPUT_BUF_SIZE){
         // wake up consoleread() if a whole line (or end-of-file)
         // has arrived.
         cons.w = cons.e;
@@ -187,6 +192,7 @@ consoleinit(void)
 
   // connect read and write system calls
   // to consoleread and consolewrite.
+  cons.concanical = 0;
   devsw[CONSOLE].read = consoleread;
   devsw[CONSOLE].write = consolewrite;
 }
