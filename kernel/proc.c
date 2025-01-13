@@ -318,9 +318,14 @@ fork(void)
   np->parent = p;
   release(&wait_lock);
 
+  acquire(&wait_lock);
+  np->mask = p->mask;
+  release(&wait_lock);
+
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
+
 
   return pid;
 }
@@ -685,4 +690,20 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int
+getnproc(void)
+{
+  struct proc *p;
+  int count = 0;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state != UNUSED) {
+      count++;
+    }
+    release(&p->lock);
+  }
+  return count;
 }

@@ -1,0 +1,6 @@
+1.looking at the backtrace output,which function called syscall?
+it is the usertrap which called syscall.
+2.what is the value of p->trapframe->a7 and what dose that value represent?
+it is 7,which represent the syscall number of syscall exec
+3.what was the previous mode that CPU was in?
+the SPP bit of sstatus is 0,which means that CPU was in user mode before trapped in kernel(which made it in supervisor mode).
