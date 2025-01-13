@@ -4,3 +4,9 @@ it is the usertrap which called syscall.
 it is 7,which represent the syscall number of syscall exec
 3.what was the previous mode that CPU was in?
 the SPP bit of sstatus is 0,which means that CPU was in user mode before trapped in kernel(which made it in supervisor mode).
+4.write down the assembly instruction the kernel is panicing at. Which register corresponds to the variable num?
+it is "lw  s2,0(zero)",the register corresponding to the variable num is s2.
+5.Why does the kernel crash?Is that confirmed by the value in scause above?
+the value of scause is 0xd,which is exception code 13 in riscv,it means "Load page fault".According to the figure3-3 in the text,the address 0 is not mapped in kernel space.The cause of kernel crash is exactly confirmed by the value of scause.
+6.What is the name of the binary that was running when the kernel paniced? What is its process id (pid)?
+it is initcode,its pid is 1.In details,original value of nextpid is 1,which process initcode is the first process.It can be confirm by the comments in the source code.
