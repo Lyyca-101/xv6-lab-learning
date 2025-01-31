@@ -74,7 +74,34 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
+  uint64 pages;
+  uint64 user_bitmask;
+  unsigned int kern_bitmask = 0;
+  int n;
+  struct proc *p = myproc();
+
+  argaddr(0,&pages);
+  argint(1,&n);
+  argaddr(2,&user_bitmask);
   // lab pgtbl: your code here.
+
+  //vmprint(p->pagetable);
+
+  for(int i = 0;i < n;i++){
+    pte_t *pte = walk(p->pagetable, pages + i * PGSIZE, 0);
+    if((*pte) & PTE_A){
+      //printf("%d:%p\n",i,*pte);
+      kern_bitmask |= 1 << i;
+      (*pte) &= ~PTE_A;
+    }
+  }
+
+  //printf("%p\n",kern_bitmask);
+
+  if(copyout(p->pagetable,user_bitmask,(char *)(&kern_bitmask),sizeof(kern_bitmask)) < 0){
+    return -1;
+  }
+
   return 0;
 }
 #endif

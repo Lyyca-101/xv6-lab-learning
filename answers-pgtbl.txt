@@ -1,0 +1,36 @@
+1.Which other xv6 system call(s) could be made faster using this shared page? Explain how.
+If xv6 has a syscall called getppid(which get the parent process pid),then it can be speeded up using
+this shared page.
+On the book,we can find the syscalls fstat and stat,when we once use one of these two
+syscalls,the stat struct of the file can be cached in the shared page,next time we retrive
+the stat struct,there is no need to get the stat by syscall and trapped in kernel mode again.
+But in a multi-processed scenario,the file might be modified by another process,so there will
+be some cache-consistency problem to be fixed.We need to flush the out-of-date state cache in 
+the shared page,and use syscall to get the up-to-date stat.
+
+2.For every leaf page in the vmprint output, explain what it logically contains and what its permission bits are.
+Figure 3.4 in the xv6 book might be helpful, although note that the figure might have a slightly different set 
+of pages than the init process that's being inspected here.
+page table 0x0000000087f6b000
+ ..0: pte 0x0000000021fd9c01 pa 0x0000000087f67000
+ .. ..0: pte 0x0000000021fd9801 pa 0x0000000087f66000
+ .. .. ..0: pte 0x0000000021fda01b pa 0x0000000087f68000
+ .. .. ..1: pte 0x0000000021fd9417 pa 0x0000000087f65000
+ .. .. ..2: pte 0x0000000021fd9007 pa 0x0000000087f64000
+ .. .. ..3: pte 0x0000000021fd8c17 pa 0x0000000087f63000
+ ..255: pte 0x0000000021fda801 pa 0x0000000087f6a000
+ .. ..511: pte 0x0000000021fda401 pa 0x0000000087f69000
+ .. .. ..509: pte 0x0000000021fdcc13 pa 0x0000000087f73000
+ .. .. ..510: pte 0x0000000021fdd007 pa 0x0000000087f74000
+ .. .. ..511: pte 0x0000000020001c0b pa 0x0000000080007000
+So,this is what we get by vmprint from the process init.
+there are 7 leaf pages,they are:0-->0-->[0,1,2,3](4 pages),255-->511-->[509,510,511](3 pages),
+and we will explain it one by one according to the riscv spec.
+physical-address    permission-bits logical-contents
+0x0000000087f68000  0x01b(U/X/R/V)  user code
+0x0000000087f65000  0x017(U/W/R/V)  user data
+0x0000000087f64000  0x007(W/R/V)    kernel data
+0x0000000087f63000  0x017(U/W/R/V)  user stack
+0x0000000087f73000  0x013(U/R/V)    user readonly data
+0x0000000087f74000  0x007(W/R/V)    kernel data
+0x0000000080007000  0x00b(X/R/V)    kernel code
