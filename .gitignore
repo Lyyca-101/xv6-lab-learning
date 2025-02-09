@@ -24,3 +24,5 @@ barrier
 /lab-*.json
 .DS_Store
 *.dSYM
+.vscode/
+xv6-labs-2023.code-workspace
