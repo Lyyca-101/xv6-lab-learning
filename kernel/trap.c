@@ -49,7 +49,7 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
   if(r_scause() == 8){
     // system call
 
@@ -77,8 +77,18 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    if(p->interval && p->handler_finished)
+      p->interval_pass = p->interval_pass + 1;
+    if(p->interval && p->handler_finished && p->interval_pass == p->interval){
+      p->interval_pass = 0;
+      *(p->resumeframe) = *(p->trapframe);
+      //printf("a0: %d\n",p->resumeframe->a0);
+      p->trapframe->epc = (uint64)p->handler;
+      p->handler_finished = 0;
+    }
     yield();
+  }
 
   usertrapret();
 }

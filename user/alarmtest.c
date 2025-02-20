@@ -187,7 +187,10 @@ test3()
   asm volatile("mv %0, a0" : "=r" (a0) );
 
   if(a0 != 0xac)
+  { 
+    //printf("a0: %d\n",a0);
     printf("test3 failed: register a0 changed\n");
+  }
   else
     printf("test3 passed\n");
 }

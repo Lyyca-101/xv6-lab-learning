@@ -1,0 +1,46 @@
+1.Which registers contain arguments to functions? 
+For example, which register holds 13 in main's call to printf?
+answer:according to riscv calling convention,register a0-a7 will contain arguments to
+functions,and a0 will also store the return value of the function.
+according to the call.asm,register a2 holds 13 in main's call to printf.
+
+2.Where is the call to function f in the assembly code for main? 
+Where is the call to g? (Hint: the compiler may inline functions.)
+answer:it seems the call to function f is optimized by compiler,"li a1,12" means the
+"f(8) + 1" is optimized directly to the result 12.
+So is the call to g,it is optimized to "addiw a0,a0,3".
+
+3.At what address is the function printf located?
+answer:the address of printf is 0x64a
+
+4.What value is in the register ra just after the jalr to printf in main?
+answer:the value of ra after jalr to printf in main is 0x38.Because ra stores return address.
+
+5.Run the following code.
+
+	unsigned int i = 0x00646c72;
+	printf("H%x Wo%s", 57616, &i);
+      
+What is the output? Here's an ASCII table that maps bytes to characters.
+The output depends on that fact that the RISC-V is little-endian.
+If the RISC-V were instead big-endian what would you set i to in order to yield the same output?
+Would you need to change 57616 to a different value?
+answer:the output is "HE110 World",the format specifier %x makes 57616 to its hex form,
+which is e110,the "e" is uppercase in the output.Because RISC-V is little-endian,
+so in memory,the value i can be seemed as 0x72 0x6c 0x64 0x00 from low address to high
+address,the same as a char array ['r','l','d','\0'],0x72 is r,0x6c is l,0x64 is d,0x00
+is \0,according to ASCII Table.
+If RISC-V is big-endian,then set unsigned int i = 0x726c6400,because most significant byte is
+stored in lowest address.There is no need to change 57616 to a different value,since e110
+is just its hex form.
+
+6.In the following code, what is going to be printed after 'y='? 
+(note: the answer is not a specific value.) Why does this happen?
+	printf("x=%d y=%d", 3);
+answer:my output is 'y=1',when this printf is called,there is no specific value for
+register a2.
+I noticed that in asm of putc,there is a instruction "li a2,1",maybe that is why
+the output is 'y=1',and we can also see that printf use va_start to enable variable
+arguments,and no matter the actual numbers of arguments,it always puts the value of 
+register a1~a7 to the stack,and make it as the ap list,the vprintf will use this ap
+list to write character to the standard output(fd=1).

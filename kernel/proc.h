@@ -100,8 +100,13 @@ struct proc {
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table
   struct trapframe *trapframe; // data page for trampoline.S
+  struct trapframe *resumeframe;// data page for sigalarm/sigreturn
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
+  uint64 interval;             // Required ticks set by sigalarm
+  uint64 interval_pass;        // Pass tick since last sigalarm
+  void (*handler)(void);       // Alarm handler set by sigalarm
+  uint8 handler_finished;      // Is the last alarm hander finished
   char name[16];               // Process name (debugging)
 };
