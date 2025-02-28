@@ -23,3 +23,5 @@ ph
 barrier
 /lab-*.json
 .DS_Store
+.vscode
+xv6-labs-2023.code-workspace

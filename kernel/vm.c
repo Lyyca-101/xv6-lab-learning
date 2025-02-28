@@ -305,8 +305,9 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 
 // Given a parent process's page table, copy
 // its memory into a child's page table.
-// Copies both the page table and the
-// physical memory.
+// use copy-on-write strategy,copies the page table,
+// for the physical memory,just shared parent's pages first
+// when actual write on child happens,then allocate new pages
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
 int
@@ -315,7 +316,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -324,17 +325,34 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
+
+    if(flags & PTE_W){
+      // a writable page
+      // convert it into a cow page for parent
+      flags &= ~PTE_W;
+      flags |= PTE_COW;
+      // clear PTE_W,set PTE_COW in RSW low bit(8th bit)
+      *pte = PA2PTE(pa) | flags;
+      // user contribute a ref count to the page
+    }
+    // both ref_count W and R page should be incremented
+    refcount_increment((void*)pa);
+    //printf("%p\n",flags);
+    /*     
+      we're going to use parent's page first
+      if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    */
+    // child may also have a cow page,it PTE_COW is set
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
       goto err;
     }
   }
+
   return 0;
 
- err:
+err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
@@ -367,8 +385,15 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
       return -1;
     pte = walk(pagetable, va0, 0);
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
-       (*pte & PTE_W) == 0)
-      return -1;
+       (*pte & PTE_W) == 0){
+        if(pte && (*pte & PTE_W) == 0 && (*pte & PTE_COW)){
+          //printf("pte: %p\n",*pte);
+          if(handle_cowpage(pagetable,va0) < 0){
+            return -1;
+          }
+          //printf("pte: %p\n",*pte);
+        }
+    }
     pa0 = PTE2PA(*pte);
     n = PGSIZE - (dstva - va0);
     if(n > len)
@@ -448,4 +473,42 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int 
+handle_cowpage(pagetable_t pagetable,uint64 va){
+  uint64 pa;
+  pte_t *pte;
+  char *mem;
+  uint flags;
+  
+  if((pte = walk(pagetable,va,0)) == 0){
+    panic("handle_cowpage: pte should exist");
+  }
+  if((*pte & PTE_V) == 0){
+    panic("handle_cowpage: page should exist");
+  }
+  //printf("%p\n",PTE_FLAGS(*pte));
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+
+  // not a cow page
+  if((flags & PTE_COW) == 0)
+    return -1;
+  // page allocation fails
+  if((mem = kalloc()) < 0)
+    return -1;
+
+  // allocate a new page and
+  // copy the content of old page to new page
+  flags &= ~PTE_COW;
+  flags |= PTE_W;
+  //printf("%p\n",flags);
+  memmove(mem,(char*)pa,PGSIZE);
+  // this process use a new page,
+  // decrease the ref_count of the old page
+  kfree((void*)pa);
+  *pte = PA2PTE(mem) | flags;
+
+  return 0;
 }

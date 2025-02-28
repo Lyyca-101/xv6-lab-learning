@@ -16,6 +16,8 @@ void kernelvec();
 
 extern int devintr();
 
+static void pagefault_handler(void);
+
 void
 trapinit(void)
 {
@@ -65,6 +67,8 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause() == 15) {
+    pagefault_handler();
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
@@ -128,6 +132,7 @@ usertrapret(void)
   uint64 trampoline_userret = TRAMPOLINE + (userret - trampoline);
   ((void (*)(uint64))trampoline_userret)(satp);
 }
+
 
 // interrupts and exceptions from kernel code go here via kernelvec,
 // on whatever the current kernel stack is.
@@ -219,3 +224,19 @@ devintr()
   }
 }
 
+static void
+pagefault_handler()
+{
+  struct proc *p = myproc();
+  uint64 fault_va = r_stval();
+
+  
+  if(handle_cowpage(p->pagetable,fault_va) < 0)
+    goto err;
+
+  return;
+
+err:
+  printf("pagefault_handler: error occurs\n");
+  setkilled(p);
+}
