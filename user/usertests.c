@@ -93,11 +93,16 @@ copyout(char *s)
     }
     close(fd);
 
+    printf("close OK\n");
+
     int fds[2];
     if(pipe(fds) < 0){
       printf("pipe() failed\n");
       exit(1);
     }
+
+    printf("pipe open\n");
+
     n = write(fds[1], "x", 1);
     if(n != 1){
       printf("pipe write failed\n");
@@ -2203,6 +2208,7 @@ sbrkfail(char *s)
     kill(pids[i]);
     wait(0);
   }
+
   if(c == (char*)0xffffffffffffffffL){
     printf("%s: failed sbrk leaked memory\n", s);
     exit(1);
@@ -3005,9 +3011,10 @@ countfree()
 
   if(pid == 0){
     close(fds[0]);
-    
+    //int num = 0;
     while(1){
       uint64 a = (uint64) sbrk(4096);
+      //printf("%d\n",++num);
       if(a == 0xffffffffffffffff){
         break;
       }
@@ -3050,9 +3057,7 @@ int
 drivetests(int quick, int continuous, char *justone) {
   do {
     printf("usertests starting\n");
-    printf("countfree begins\n");
     int free0 = countfree();
-    printf("countfree over\n");
     int free1 = 0;
     if (runtests(quicktests, justone, continuous)) {
       if(continuous != 2) {

@@ -85,8 +85,10 @@ kvminithart()
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
-  if(va >= MAXVA)
+  if(va >= MAXVA){  
+    backtrace();
     panic("walk");
+  }
 
   for(int level = 2; level > 0; level--) {
     pte_t *pte = &pagetable[PX(level, va)];
@@ -344,7 +346,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
     */
-    // child may also have a cow page,it PTE_COW is set
+    // child may also have a cow page,if PTE_COW is set
     if(mappages(new, i, PGSIZE, pa, flags) != 0){
       goto err;
     }
@@ -386,12 +388,14 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     pte = walk(pagetable, va0, 0);
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
        (*pte & PTE_W) == 0){
-        if(pte && (*pte & PTE_W) == 0 && (*pte & PTE_COW)){
-          //printf("pte: %p\n",*pte);
+        // whether is a user writable and valid page
+        if(pte != 0 && (*pte & PTE_V) != 0 && (*pte & PTE_W) == 0 && 
+        (*pte & PTE_COW) != 0 && (*pte & PTE_U)){
           if(handle_cowpage(pagetable,va0) < 0){
             return -1;
           }
-          //printf("pte: %p\n",*pte);
+        } else {
+          return -1;
         }
     }
     pa0 = PTE2PA(*pte);
@@ -482,6 +486,7 @@ handle_cowpage(pagetable_t pagetable,uint64 va){
   char *mem;
   uint flags;
   
+  va = PGROUNDDOWN(va);
   if((pte = walk(pagetable,va,0)) == 0){
     panic("handle_cowpage: pte should exist");
   }
@@ -506,9 +511,13 @@ handle_cowpage(pagetable_t pagetable,uint64 va){
   //printf("%p\n",flags);
   memmove(mem,(char*)pa,PGSIZE);
   // this process use a new page,
-  // decrease the ref_count of the old page
-  kfree((void*)pa);
-  *pte = PA2PTE(mem) | flags;
+  // unmap the old page
+  // map to the new page
+  uvmunmap(pagetable,va,1,1);
+  if(mappages(pagetable,va,PGSIZE,(uint64)mem,flags)<0){
+    uvmfree(pagetable,0);
+    return -1;
+  }
 
   return 0;
 }

@@ -26,7 +26,10 @@ fetchstr(uint64 addr, char *buf, int max)
 {
   struct proc *p = myproc();
   if(copyinstr(p->pagetable, buf, addr, max) < 0)
+  {
+    //backtrace();
     return -1;
+  }
   return strlen(buf);
 }
 

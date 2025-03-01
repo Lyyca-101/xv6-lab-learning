@@ -65,6 +65,7 @@ void            kfree(void *);
 void            kinit(void);
 void            refcount_increment(void *);
 void            refcount_decrement(void *);
+void            meminfo(void);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -82,6 +83,7 @@ int             pipewrite(struct pipe*, uint64, int);
 void            printf(char*, ...);
 void            panic(char*) __attribute__((noreturn));
 void            printfinit(void);
+void            backtrace(void);
 
 // proc.c
 int             cpuid(void);

@@ -68,12 +68,24 @@ usertrap(void)
 
     syscall();
   } else if(r_scause() == 15) {
-    pagefault_handler();
+    if(r_stval() >= MAXVA || r_stval() >= KERNBASE){
+      setkilled(p);
+    } else {
+      pagefault_handler();
+    }
+  } else if(r_scause() == 13){
+    // for read page fault will just make process fails
+    // we won't do anything to handle it,and kernel does not panic
+    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    setkilled(p);
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    meminfo();
+    //backtrace();
     setkilled(p);
   }
 
@@ -152,6 +164,7 @@ kerneltrap()
   if((which_dev = devintr()) == 0){
     printf("scause %p\n", scause);
     printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+    backtrace();
     panic("kerneltrap");
   }
 
@@ -224,6 +237,9 @@ devintr()
   }
 }
 
+
+// we make sure that the error va is not over the MAXVA
+// or touches kernel's memory
 static void
 pagefault_handler()
 {
