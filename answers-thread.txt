@@ -1,0 +1,4 @@
+1.Why are there missing keys with 2 threads, but not with 1 thread? 
+Identify a sequence of events with 2 threads that can lead to a key being missing.
+WHEN there are 2 threads,they put key-value pairs to the hashtable concurrently,which
+makes some updates to the hash bucket lost(especially the insert operation).
