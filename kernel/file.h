@@ -9,6 +9,7 @@ struct file {
   char writable;
   struct pipe *pipe; // FD_PIPE
   struct inode *ip;  // FD_INODE and FD_DEVICE
+  // these LAB_XX-like macro is provided by XCFLAGS in Makfile
 #ifdef LAB_NET
   struct sock *sock; // FD_SOCK
 #endif

@@ -267,7 +267,7 @@ net_rx_arp(struct mbuf *m)
   }
 
   // only requests are supported so far
-  // check if our IP was solicited
+  // check if our IP was solicited(or requested)
   tip = ntohl(arphdr->tip); // target IP address
   if (ntohs(arphdr->op) != ARP_OP_REQUEST || tip != local_ip)
     goto done;

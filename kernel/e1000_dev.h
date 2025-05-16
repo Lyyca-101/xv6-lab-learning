@@ -50,7 +50,7 @@
 #define E1000_RCTL_EN             0x00000002    /* enable */
 #define E1000_RCTL_SBP            0x00000004    /* store bad packet */
 #define E1000_RCTL_UPE            0x00000008    /* unicast promiscuous enable */
-#define E1000_RCTL_MPE            0x00000010    /* multicast promiscuous enab */
+#define E1000_RCTL_MPE            0x00000010    /* multicast promiscuous enable */
 #define E1000_RCTL_LPE            0x00000020    /* long packet enable */
 #define E1000_RCTL_LBM_NO         0x00000000    /* no loopback mode */
 #define E1000_RCTL_LBM_MAC        0x00000040    /* MAC loopback mode */
