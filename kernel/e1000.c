@@ -133,6 +133,8 @@ e1000_transmit(struct mbuf *m)
 
   acquire(&e1000_tx_lock);
 
+  //printf("[E1000]: transmit begins\n");
+
   // at this point,we have a done tx_desc,or a first-use tx_desc
   // the RS bit of latter is not set
   if(desc->cmd & E1000_TXD_CMD_RS)
@@ -145,6 +147,8 @@ e1000_transmit(struct mbuf *m)
   tx_mbufs[tail] = m;
 
   regs[E1000_TDT] = (tail + 1) % TX_RING_SIZE;
+
+  //printf("[E1000]: transmit ends\n");
 
   release(&e1000_tx_lock);
 
@@ -192,7 +196,7 @@ e1000_recv(void)
       // this packet is not ready
       // for now,multi-desc packet is not supported
       if((desc->status & E1000_RXD_STAT_DD)  && !(desc-> status & E1000_RXD_STAT_EOP)){
-        printf("[e1000 driver]: cannot handle multi-desc packet.\n");
+        //printf("[e1000 driver]: cannot handle multi-desc packet.\n");
       }
       break;
     }
@@ -208,7 +212,9 @@ e1000_recv(void)
       panic("e1000");
     desc->addr = (uint64) rx_mbufs[tail]->head;
     desc->status = 0;
-    regs[E1000_RDT] = (tail + 1) % RX_RING_SIZE;
+    // Finally, update the E1000_RDT register 
+    // to be the index of the last ring descriptor processed.
+    regs[E1000_RDT] = tail;
     release(&e1000_rx_lock);
   }
   //printf("[E1000]: reception out\n");
@@ -227,5 +233,7 @@ e1000_intr(void)
   regs[E1000_ICR] = 0xffffffff;
 
   // process thoese rx desc
+  //printf("[E1000]: intr\n");
   e1000_recv();
+  //printf("[E1000]: intr out\n");
 }

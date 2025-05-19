@@ -165,6 +165,8 @@ sockrecvudp(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport)
   //
   struct sock *si;
 
+  //printf("[sock_recv]: in\n");
+
   acquire(&lock);
   si = sockets;
   while (si) {
@@ -177,6 +179,7 @@ sockrecvudp(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport)
   return;
 
 found:
+  //printf("[sock_recv]: found\n");
   acquire(&si->lock);
   mbufq_pushtail(&si->rxq, m);
   wakeup(&si->rxq);

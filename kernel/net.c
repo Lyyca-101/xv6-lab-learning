@@ -223,6 +223,8 @@ net_tx_arp(uint16 op, uint8 dmac[ETHADDR_LEN], uint32 dip)
   struct mbuf *m;
   struct arp *arphdr;
 
+  //printf("[arp_tx]: in\n");
+
   m = mbufalloc(MBUF_DEFAULT_HEADROOM);
   if (!m)
     return -1;
@@ -242,6 +244,7 @@ net_tx_arp(uint16 op, uint8 dmac[ETHADDR_LEN], uint32 dip)
   arphdr->tip = htonl(dip);
 
   // header is ready, send the packet
+  //printf("[arp_tx]: send the reply\n");
   net_tx_eth(m, ETHTYPE_ARP);
   return 0;
 }
@@ -275,6 +278,7 @@ net_rx_arp(struct mbuf *m)
   // handle the ARP request
   memmove(smac, arphdr->sha, ETHADDR_LEN); // sender's ethernet address
   sip = ntohl(arphdr->sip); // sender's IP address (qemu's slirp)
+  //printf("[arp_rx]: reply\n");
   net_tx_arp(ARP_OP_REPLY, smac, sip);
 
 done:
@@ -289,13 +293,14 @@ net_rx_udp(struct mbuf *m, uint16 len, struct ip *iphdr)
   uint32 sip;
   uint16 sport, dport;
 
+  //printf("[udp_recv]: in\n");
 
   udphdr = mbufpullhdr(m, *udphdr);
   if (!udphdr)
     goto fail;
 
   // TODO: validate UDP checksum
-  
+  // do not think it is necessary for basic experiment
 
   // validate lengths reported in headers
   if (ntohs(udphdr->ulen) != len)
@@ -323,6 +328,8 @@ net_rx_ip(struct mbuf *m)
 {
   struct ip *iphdr;
   uint16 len;
+
+  //printf("[ip_recv]: in\n");
 
   iphdr = mbufpullhdr(m, *iphdr);
   if (!iphdr)
@@ -366,10 +373,16 @@ void net_rx(struct mbuf *m)
   }
 
   type = ntohs(ethhdr->type);
-  if (type == ETHTYPE_IP)
+  if (type == ETHTYPE_IP) {
+    //printf("[net_rx]: goto ip\n");
     net_rx_ip(m);
-  else if (type == ETHTYPE_ARP)
+  }
+  else if (type == ETHTYPE_ARP){
+    //printf("[net_rx]: goto arp\n");
     net_rx_arp(m);
-  else
+  }
+  else{
+    //printf("[net_rx]: unsupport IP layer protocol\n");
     mbuffree(m);
+  }
 }
