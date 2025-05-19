@@ -97,6 +97,10 @@
 #define E1000_TXD_STAT_DD    0x00000001 /* Descriptor Done */
 
 // [E1000 3.3.3]
+// Transmit Descriptor (TDESC) Layout – Legacy Mode
+// it seems 3.3.5~3.3.7 is not useful in basic experiment
+// which is another more complicated and powerful mode
+// for packet transmission
 struct tx_desc
 {
   uint64 addr;

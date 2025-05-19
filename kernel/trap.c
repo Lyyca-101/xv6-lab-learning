@@ -66,6 +66,7 @@ usertrap(void)
 
     syscall();
   } else if((which_dev = devintr()) != 0){
+    // there is no intr_on()
     // ok
   } else {
 

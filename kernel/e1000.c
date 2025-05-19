@@ -12,14 +12,16 @@
 static struct tx_desc tx_ring[TX_RING_SIZE] __attribute__((aligned(16)));
 static struct mbuf *tx_mbufs[TX_RING_SIZE];
 
-#define RX_RING_SIZE 16
+// guess 32 buffers are enough for packets recpetion
+#define RX_RING_SIZE 32
 static struct rx_desc rx_ring[RX_RING_SIZE] __attribute__((aligned(16)));
 static struct mbuf *rx_mbufs[RX_RING_SIZE];
 
 // remember where the e1000's registers live.
 static volatile uint32 *regs;
 
-struct spinlock e1000_lock;
+struct spinlock e1000_tx_lock;
+struct spinlock e1000_rx_lock;
 
 // called by pci_init().
 // xregs is the memory address at which the
@@ -29,7 +31,9 @@ e1000_init(uint32 *xregs)
 {
   int i;
 
-  initlock(&e1000_lock, "e1000");
+  initlock(&e1000_tx_lock, "e1000_tx");
+  initlock(&e1000_rx_lock, "e1000_rx");
+
 
   regs = xregs;
 
@@ -87,10 +91,19 @@ e1000_init(uint32 *xregs)
     E1000_RCTL_SECRC;                // strip CRC
   
   // ask e1000 for receive interrupts.
+  /* 
+    [E1000 3.2.7.1.1 Receive Interrupt Delay Timer / Packet Timer (RDTR)]
+    Setting the Packet Timer to 0b disables both the Packet Timer
+    and the Absolute Timer(RADV) and causes the Receive Timer Interrupt
+    to be generated whenever a new packet has been stored in memory.
+  */
   regs[E1000_RDTR] = 0; // interrupt after every received packet (no timer)
   regs[E1000_RADV] = 0; // interrupt after every packet (no timer)
+  // [E1000 13.4.20 Interrupt Mask Set/Read Register]
+  // 7b of IMS: RXT0: Sets mask for Receiver Timer Interrupt
   regs[E1000_IMS] = (1 << 7); // RXDW -- Receiver Descriptor Write Back
 }
+
 
 int
 e1000_transmit(struct mbuf *m)
@@ -101,9 +114,50 @@ e1000_transmit(struct mbuf *m)
   // the mbuf contains an ethernet frame; program it into
   // the TX descriptor ring so that the e1000 sends it. Stash(or Store)
   // a pointer so that it can be freed after sending.
-  //
+  // we also assume every packet needs only one tx_desc
   
+  // [E1000 3.4]
+  // The process of checking for completed packets consists of one of the following:
+  // 1.Scan memory for descriptor status write-backs.
+  // 2 Take an interrupt. An interrupt condition [E1000 3.4.3]
+  //   can be generated whenever a transmit queue goes empty (ICR.TXQE). 
+  //   Interrupts can also be triggered in other ways.
+  // we will use the first way to check completed packet
+  int tail = regs[E1000_TDT];
+  struct tx_desc *desc = &tx_ring[tail];
+
+  if((desc->cmd & E1000_TXD_CMD_RS) && !(desc->status & E1000_TXD_STAT_DD)){
+    // transmission is not completed
+    return -1;
+  }
+
+  acquire(&e1000_tx_lock);
+
+  // at this point,we have a done tx_desc,or a first-use tx_desc
+  // the RS bit of latter is not set
+  if(desc->cmd & E1000_TXD_CMD_RS)
+    mbuffree(tx_mbufs[tail]);
+
+  desc->addr = (uint64)m->head;
+  desc->length = m->len;
+  desc->cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
+  desc->status &= ~E1000_TXD_STAT_DD;
+  tx_mbufs[tail] = m;
+
+  regs[E1000_TDT] = (tail + 1) % TX_RING_SIZE;
+
+  release(&e1000_tx_lock);
+
   return 0;
+}
+
+static int
+has_valid_packet() {
+  // initial state after configuration
+  // regs[E1000_RDH] = 0,regs[E1000_RDT] = RX_RING_SIZE - 1
+  // by that time,there is no valid packet for software
+  // and (regs[E1000_RDT] + 1) % RX_RING_SIZE = regs[E1000_RDH] = 0
+  return (regs[E1000_RDT] + 1) % RX_RING_SIZE != regs[E1000_RDH];
 }
 
 static void
@@ -111,20 +165,67 @@ e1000_recv(void)
 {
   //
   // Your code here.
+  // You'll need locks to cope with the possibility that
+  // xv6 might use the E1000 from more than one process,
+  // or might be using the E1000 in a kernel thread when 
+  // an interrupt arrives.
   //
-  // Check for packets that have arrived from the e1000
+  // Check for PACKETS that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
-  //
   
+  // how do I know there are some desc waiting to be processed
+  // when has_valid_packet = 0
+  // that means (tail + 1) % RX_RING_SZ == head
+  // tail and head are just "side by side"
+  // let's assume that a packet is not larger than a mbuf
+  while(has_valid_packet()){
+    //printf("[E1000]: reception\n");
+    acquire(&e1000_rx_lock);
+    uint32 tail = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
+    struct rx_desc *desc = &rx_ring[tail];
+    // headroom is 0
+    // addr is the pos of buf,-20 make it point to the start of this mbuf
+    // 8 + 8 + 4 = 20
+    struct mbuf *m = (struct mbuf *)((char *)desc->addr - MBUF_BEFORE_BUF);
+
+    if(!(desc->status & E1000_RXD_STAT_DD) || !(desc-> status & E1000_RXD_STAT_EOP)){
+      // this packet is not ready
+      // for now,multi-desc packet is not supported
+      if((desc->status & E1000_RXD_STAT_DD)  && !(desc-> status & E1000_RXD_STAT_EOP)){
+        printf("[e1000 driver]: cannot handle multi-desc packet.\n");
+      }
+      break;
+    }
+
+    // now the driver get a valid packet
+    m->len = desc->length;
+
+    net_rx(m);
+
+    // after sending packet,allocate new space for this rx_mbuf
+    rx_mbufs[tail] = mbufalloc(0);
+    if (!rx_mbufs[tail])
+      panic("e1000");
+    desc->addr = (uint64) rx_mbufs[tail]->head;
+    desc->status = 0;
+    regs[E1000_RDT] = (tail + 1) % RX_RING_SIZE;
+    release(&e1000_rx_lock);
+  }
+  //printf("[E1000]: reception out\n");
 }
 
+
+// See [E1000 3.2.7 Receive Interrupts]
 void
 e1000_intr(void)
 {
   // tell the e1000 we've seen this interrupt;
   // without this the e1000 won't raise any
   // further interrupts.
+  // [E1000  13.4.17 Interrupt Cause Read Register]
+  // Writing a 1b to any bit in the register also clears that bit.
   regs[E1000_ICR] = 0xffffffff;
 
+  // process thoese rx desc
   e1000_recv();
 }
