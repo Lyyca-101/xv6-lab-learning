@@ -18,15 +18,21 @@ struct run {
   struct run *next;
 };
 
+#define BUFSZ 100
 struct {
-  struct spinlock lock;
-  struct run *freelist;
+  struct spinlock lock[NCPU];
+  char bufs[NCPU][BUFSZ];
+  struct run *freelist[NCPU];
 } kmem;
 
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
+  // lab-lock concern
+  for(int i = 0;i < NCPU;i++){
+    snprintf(kmem.bufs[i],BUFSZ,"kmem%d",i);
+    initlock(&kmem.lock[i],kmem.bufs[i]);
+  }
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -35,8 +41,10 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
+  push_off();
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
+  pop_off();
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -47,6 +55,9 @@ void
 kfree(void *pa)
 {
   struct run *r;
+  push_off();
+
+  int cpu_no = cpuid();
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
@@ -56,10 +67,12 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  acquire(&kmem.lock[cpu_no]);
+  r->next = kmem.freelist[cpu_no];
+  kmem.freelist[cpu_no] = r;
+  release(&kmem.lock[cpu_no]);
+  pop_off();
+
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -70,13 +83,34 @@ kalloc(void)
 {
   struct run *r;
 
-  acquire(&kmem.lock);
-  r = kmem.freelist;
+  push_off();
+
+  int cpu_no = cpuid();
+
+  acquire(&kmem.lock[cpu_no]);
+  r = kmem.freelist[cpu_no];
   if(r)
-    kmem.freelist = r->next;
-  release(&kmem.lock);
+    kmem.freelist[cpu_no] = r->next;
+  release(&kmem.lock[cpu_no]);
+
+  if(!r){
+    // steal another CPU's page
+    for(int i = 0;i < NCPU;i++){
+      acquire(&kmem.lock[i]);
+      if(kmem.freelist[i]){
+        r = kmem.freelist[i];
+        kmem.freelist[i] = r->next;
+        release(&kmem.lock[i]);
+        break;
+      }
+      release(&kmem.lock[i]);
+    }
+  }
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  
+  pop_off();
+  
   return (void*)r;
 }

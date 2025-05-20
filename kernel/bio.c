@@ -37,7 +37,7 @@ void
 binit(void)
 {
   struct buf *b;
-
+  // lab-lock concern
   initlock(&bcache.lock, "bcache");
 
   // Create linked list of buffers
