@@ -248,14 +248,12 @@ create(char *path, short type, short major, short minor)
   struct inode *ip, *dp;
   char name[DIRSIZ];
 
-  printf("[create]: 1\n");
 
   if((dp = nameiparent(path, name)) == 0)
     return 0;
 
   ilock(dp);
 
-  printf("[create]: 2\n");
 
   if((ip = dirlookup(dp, name, 0)) != 0){
     iunlockput(dp);
@@ -271,7 +269,6 @@ create(char *path, short type, short major, short minor)
     return 0;
   }
 
-  printf("[create]: 3\n");
 
   /* problem ilock */
   ilock(ip);
@@ -279,11 +276,9 @@ create(char *path, short type, short major, short minor)
   ip->minor = minor;
   ip->nlink = 1;
 
-  printf("[create]: 3.1\n");
 
   iupdate(ip);
 
-  printf("[create]: 4\n");
 
   if(type == T_DIR){  // Create . and .. entries.
     // No ip->nlink++ for ".": avoid cyclic ref count.
@@ -405,8 +400,6 @@ sys_mknod(void)
   char path[MAXPATH];
   int major, minor;
 
-  printf("[mknod]: start \n");
-
   begin_op();
   argint(1, &major);
   argint(2, &minor);
@@ -417,7 +410,6 @@ sys_mknod(void)
   }
   iunlockput(ip);
   end_op();
-  printf("[mknod]: ends \n");
   return 0;
 }
 
