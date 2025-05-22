@@ -57,7 +57,6 @@ binit(void)
   for(int i = 0;i < HASH_TBL_SZ;i++){
     snprintf(hashtbl.buf[i],BUFSZ,"bcache_%d",i);
     initlock(&hashtbl.locks[i],hashtbl.buf[i]);
-    memset(&hashtbl.buckets[i],0,sizeof(hashtbl.buckets[i]));
     //hashtbl.buckets[i].next = &hashtbl.buckets[i];
     //hashtbl.buckets[i].prev = &hashtbl.buckets[i];
   }
@@ -76,7 +75,6 @@ binit(void)
     // make it easier to iterate the linked list,you can find it in leetcode
     //b->next = bcache.head.next;
     //b->prev = &bcache.head;
-    memset(b,0,sizeof(*b));
     initsleeplock(&b->lock, "buffer");
     //bcache.head.next->prev = b;
     //bcache.head.next = b;
@@ -113,12 +111,13 @@ bget(uint dev, uint blockno)
 
   int index = hash(blockno);
 
+  acquire(&bcache.lock);
   acquire(&hashtbl.locks[index]);
 
   //printf("[bget] index: %d blockno: %d\n",index,blockno);
   // Is the block already cached?
   // search in the hash bucket
-  b = (&hashtbl.buckets[index])->next;
+  b = hashtbl.buckets[index].next;
 
   while(b){
     printf("[bget] in 1 blockno: %d\n",blockno);
@@ -128,6 +127,7 @@ bget(uint dev, uint blockno)
       b->refcnt++;
       //printf("[bget] out 1\n");
       release(&hashtbl.locks[index]);
+      release(&bcache.lock);
       acquiresleep(&b->lock);
       return b;
     }
@@ -142,10 +142,10 @@ bget(uint dev, uint blockno)
     }
   } */
 
-  acquire(&bcache.lock);
-  printf("[bget] in 2\n");
+  //acquire(&bcache.lock);
+  printf("[bget] in 2 cpu: %p blockno: %d\n",mycpu(),blockno);
   // Your modified cache does not need to use LRU replacement,
-  // but it must be able to use any of the NBUF struct bufs 
+  // but it must be able to use any of the NBUF struct bufs
   // with zero refcnt when it misses in the cache
   // Not cached.
   for(b = bcache.buf; b < bcache.buf+NBUF; b++){
@@ -164,10 +164,12 @@ bget(uint dev, uint blockno)
       if(head->next){
         head->next->prev = b;
         head->next = b;
+      } else {
+        head->next = b;
       }
-      //printf("[bget] out 2\n");
-      release(&bcache.lock);
+      //printf("[bget] out 2 index: %d next: %p\n",index,head->next);
       release(&hashtbl.locks[index]);
+      release(&bcache.lock);
       acquiresleep(&b->lock);
       return b;
     }
@@ -227,6 +229,9 @@ brelse(struct buf *b)
     panic("brelse: release zero-refcnt buf");
   b->refcnt--;
   if(b->refcnt == 0){
+    if(b->blockno == 33){
+      printf("[brelse]: %p\n",b->next);
+    }
     // detach the block buffer from the hash bucket
     b->prev->next = b->next;
     if(b->next) b->next->prev = b->prev;
@@ -257,6 +262,7 @@ bpin(struct buf *b) {
 void
 bunpin(struct buf *b) {
   acquire(&bcache.lock);
+  printf("[bunpin]\n");
   b->refcnt--;
   release(&bcache.lock);
 }

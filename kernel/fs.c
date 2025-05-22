@@ -313,7 +313,9 @@ ilock(struct inode *ip)
     ip->valid = 1;
     if(ip->type == 0){
       backtrace();
-      printf("[ilock]: inum: %d blockno: %d\n",ip->inum,IBLOCK(ip->inum, sb));
+      printf("[ilock]: inum: %d blockno: %d b: %p\n",
+        ip->inum,IBLOCK(ip->inum, sb),bp);
+      procdump();
       panic("ilock: no type");
     }
   }
