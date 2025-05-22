@@ -1,6 +1,6 @@
 struct buf {
   int valid;   // has data been read from disk?
-  int disk;    // does disk "own" buf?
+  int disk;    // does disk "own" buf?modified by virtio disk driver
   uint dev;
   uint blockno;
   struct sleeplock lock;
