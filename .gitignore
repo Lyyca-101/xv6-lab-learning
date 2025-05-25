@@ -25,3 +25,5 @@ barrier
 .DS_Store
 *.dSYM
 *.pcap
+.vscode/
+xv6-labs-2023.code-workspace
