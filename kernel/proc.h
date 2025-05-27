@@ -79,6 +79,18 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
+struct vma {
+  uint64  addr;
+  uint64  length;
+  struct  file *f;
+  int     prot;
+  int     flags;
+  int     offset;
+  uint8   used;
+};
+
+#define MAX_VMA 16
+
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
@@ -96,12 +108,14 @@ struct proc {
   struct proc *parent;         // Parent process
 
   // these are private to the process, so p->lock need not be held.
-  uint64 kstack;               // Virtual address of kernel stack
-  uint64 sz;                   // Size of process memory (bytes)
-  pagetable_t pagetable;       // User page table
-  struct trapframe *trapframe; // data page for trampoline.S
-  struct context context;      // swtch() here to run process
-  struct file *ofile[NOFILE];  // Open files
-  struct inode *cwd;           // Current directory
-  char name[16];               // Process name (debugging)
+  uint64 kstack;                      // Virtual address of kernel stack
+  uint64 sz;                          // Size of process memory (bytes)
+  pagetable_t pagetable;              // User page table
+  struct trapframe *trapframe;        // data page for trampoline.S
+  struct context context;             // swtch() here to run process
+  struct file *ofile[NOFILE];         // Open files
+  struct vma  vmas[MAX_VMA];          // Virtual memory area descriptor for mmap,per-proc
+  uint64        unused_addr;          // Start of unused mmap addr
+  struct inode *cwd;                  // Current directory
+  char name[16];                      // Process name (debugging)
 };

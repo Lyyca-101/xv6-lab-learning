@@ -503,3 +503,49 @@ sys_pipe(void)
   }
   return 0;
 }
+
+
+/*
+  @param addr: virtual addr,in this lab,assume it is 0,
+  meaning that kernel will for find it for the process
+  @param length: length of the vma
+  @param prot:READ|WRITE|EXECUTE
+  @param flags:SHARED|PRIVATE,the former need to write back,the latter is not
+  @param fd:open file descriptor of the mapped file
+  @param offset:start byte of the mapping area of the file,in this lab
+  assume it is 0
+*/
+uint64
+sys_mmap(void){
+  uint64 addr,mmap_addr;
+  struct file *fp;
+  int length,prot,flags,fd,offset;
+
+  argaddr(0,&addr);
+  argint(1,&length);
+  argint(2,&prot);
+  argint(3,&flags);
+  if(argfd(4,&fd,&fp) < 0){
+    return -1;
+  }
+  argint(5,&offset);
+
+  mmap_addr = build_vma(length,prot,flags,fp,offset);
+
+  return mmap_addr;
+}
+
+
+uint64
+sys_munmap(void){
+  uint64 addr;
+  int length;
+  int ret;
+
+  argaddr(0,&addr);
+  argint(1,&length);
+
+  ret = unmap_vma(addr,length);
+
+  return ret;
+}

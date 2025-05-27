@@ -88,6 +88,7 @@ int             pipewrite(struct pipe*, uint64, int);
 void            printf(char*, ...);
 void            panic(char*) __attribute__((noreturn));
 void            printfinit(void);
+void            backtrace(void);
 
 // proc.c
 int             cpuid(void);
@@ -244,3 +245,8 @@ int             sockread(struct sock *, uint64, int);
 int             sockwrite(struct sock *, uint64, int);
 void            sockrecvudp(struct mbuf*, uint32, uint16, uint16);
 #endif
+
+// mmap.c
+uint64 build_vma(int,int,int,struct file*,int);
+int pagefault_handler_vma(uint64,struct proc *);
+int unmap_vma(uint64,int);

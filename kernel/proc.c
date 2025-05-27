@@ -143,6 +143,8 @@ found:
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
+  memset(&p->vmas,0,sizeof(p->vmas));
+  p->unused_addr = MMAP_AREA;
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
@@ -308,6 +310,19 @@ fork(void)
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
+  for(i = 0; i < MAX_VMA; i++){
+    if(p->vmas[i].used){
+      np->vmas[i].addr    = p->vmas[i].addr;
+      np->vmas[i].f       = p->vmas[i].f;
+      np->vmas[i].flags   = p->vmas[i].flags;
+      np->vmas[i].length  = p->vmas[i].length;
+      np->vmas[i].offset  = p->vmas[i].offset;
+      np->vmas[i].prot    = p->vmas[i].prot;
+      np->vmas[i].used = 1;
+      filedup(np->vmas[i].f);
+    }
+  }
+
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
@@ -359,6 +374,15 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+
+  // release all the remaining mmap area
+  for(int i = 0;i < MAX_VMA; i++){
+    if(p->vmas[i].used){
+      //printf("[exit]: addr: %p length: %d\n",p->vmas[i].addr,p->vmas[i].length);
+      unmap_vma(p->vmas[i].addr,p->vmas[i].length);
+    }
+  }
+
 
   begin_op();
   iput(p->cwd);

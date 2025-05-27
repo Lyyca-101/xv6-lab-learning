@@ -62,3 +62,8 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
+
+// use the 10 pages below trapframe in the virtaul address space
+// of a process to do mmap
+#define MAX_MMAP_PAGE 16
+#define MMAP_AREA (TRAPFRAME - MAX_MMAP_PAGE * PGSIZE)
